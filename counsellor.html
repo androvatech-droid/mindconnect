@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MindConnect — Counsellor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Source+Sans+3:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/socket.io-client@4/dist/socket.io.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1/dist/peerjs.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --ink: #1a1a1a; --ink-muted: #555; --ink-light: #888;
+    --border: #d0cec8; --bg: #faf9f7; --bg-card: #fff;
+    --accent: #2c6b5a; --accent-light: #e8f2ef;
+    --danger: #8b2b2b;
+    --serif: 'Lora', Georgia, serif;
+    --sans: 'Source Sans 3', sans-serif;
+  }
+  body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 17px; line-height: 1.7; min-height: 100vh; }
+
+  header { padding: 1.5rem 2rem 0; max-width: 860px; margin: 0 auto; }
+  .site-title { font-family: var(--serif); font-size: 1.8rem; font-weight: 600; color: var(--ink); }
+  .site-sub { font-size: 0.9rem; color: var(--ink-muted); margin-top: 0.1rem; }
+  .divider { border: none; border-top: 2px solid var(--ink); margin-top: 1rem; }
+
+  main { max-width: 860px; margin: 0 auto; padding: 2.5rem 2rem 4rem; }
+
+  /* LOGIN */
+  #loginScreen { text-align: center; max-width: 360px; margin: 4rem auto; }
+  #loginScreen h2 { font-family: var(--serif); font-size: 1.3rem; font-weight: 500; margin-bottom: 0.5rem; }
+  #loginScreen p { font-size: 0.9rem; color: var(--ink-muted); margin-bottom: 1.5rem; }
+  .field { width: 100%; font-family: var(--sans); font-size: 1rem; border: 1px solid var(--border); border-radius: 3px; padding: 0.6rem 0.8rem; background: var(--bg); color: var(--ink); outline: none; margin-bottom: 0.75rem; }
+  .field:focus { border-color: var(--accent); }
+  .btn-primary { width: 100%; background: var(--accent); border: none; color: #fff; font-family: var(--sans); font-size: 1rem; font-weight: 500; padding: 0.7rem; border-radius: 3px; cursor: pointer; }
+  .btn-primary:hover { background: #234f43; }
+  .error-msg { color: var(--danger); font-size: 0.85rem; margin-top: 0.5rem; display: none; }
+
+  /* DASHBOARD */
+  #dashboard { display: none; }
+  .status-bar { display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .badge { display: inline-flex; align-items: center; gap: 0.4rem; background: var(--accent-light); border: 1px solid #c0d9d0; border-radius: 3px; padding: 0.3rem 0.75rem; font-size: 0.85rem; color: var(--accent); font-weight: 500; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .queue-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px; padding: 2rem; text-align: center; margin-bottom: 2rem; }
+  .queue-num { font-family: var(--serif); font-size: 4rem; font-weight: 400; color: var(--ink); line-height: 1; }
+  .queue-label { font-size: 0.9rem; color: var(--ink-light); margin-top: 0.25rem; margin-bottom: 1.5rem; }
+  .accept-btn { background: var(--accent); border: none; color: #fff; font-family: var(--sans); font-size: 1rem; font-weight: 500; padding: 0.75rem 2.5rem; border-radius: 3px; cursor: pointer; transition: background 0.15s; }
+  .accept-btn:hover { background: #234f43; }
+  .accept-btn:disabled { background: #aaa; cursor: not-allowed; }
+
+  /* SESSION */
+  .session-area { display: none; gap: 1.5rem; grid-template-columns: 1fr 320px; }
+  .session-area.visible { display: grid; }
+  .video-area { background: #111; border-radius: 4px; aspect-ratio: 4/3; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+  .video-label { color: #555; font-style: italic; font-size: 0.9rem; }
+  video { width: 100%; height: 100%; object-fit: cover; position: absolute; top:0; left:0; }
+  #selfVideoCounsellor { position: absolute; bottom: 12px; right: 12px; width: 100px; height: 75px; z-index: 10; border-radius: 3px; border: 1px solid #444; object-fit: cover; }
+
+  .timer-display { font-family: var(--serif); font-size: 2rem; color: var(--ink); margin: 0.5rem 0 1rem; display: none; }
+
+  .chat-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px; display: flex; flex-direction: column; min-height: 360px; }
+  .chat-header { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); font-size: 0.82rem; color: var(--ink-muted); font-weight: 500; }
+  .chat-messages { flex: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
+  .msg { max-width: 85%; padding: 0.5rem 0.75rem; border-radius: 3px; font-size: 0.85rem; line-height: 1.5; }
+  .msg.them { background: var(--bg); border: 1px solid var(--border); align-self: flex-start; color: var(--ink); }
+  .msg.me { background: var(--accent-light); border: 1px solid #c0d9d0; align-self: flex-end; color: var(--ink); }
+  .msg-meta { font-size: 0.72rem; color: var(--ink-light); margin-top: 2px; }
+  .chat-input-row { padding: 0.75rem; border-top: 1px solid var(--border); display: flex; gap: 0.5rem; }
+  .chat-input { flex: 1; font-family: var(--sans); font-size: 0.85rem; border: 1px solid var(--border); border-radius: 3px; padding: 0.4rem 0.6rem; background: var(--bg); color: var(--ink); outline: none; }
+  .chat-input:focus { border-color: var(--accent); }
+  .send-btn { background: var(--accent); border: none; color: #fff; font-size: 0.85rem; padding: 0.4rem 0.8rem; border-radius: 3px; cursor: pointer; }
+
+  .end-btn { background: var(--danger); border: none; color: #fff; font-family: var(--sans); font-size: 0.9rem; font-weight: 500; padding: 0.55rem 1.5rem; border-radius: 3px; cursor: pointer; margin-top: 1rem; display: none; }
+  .end-btn:hover { background: #6b1e1e; }
+
+  .ended-msg { display: none; padding: 1.5rem; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; text-align: center; margin-top: 1.5rem; font-family: var(--serif); font-style: italic; color: var(--ink-muted); }
+
+  @media (max-width: 600px) { .session-area { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="site-title">MindConnect</div>
+  <div class="site-sub">Counsellor dashboard</div>
+  <hr class="divider">
+</header>
+
+<main>
+
+  <!-- LOGIN -->
+  <div id="loginScreen">
+    <h2>Counsellor access</h2>
+    <p>Enter your password to access the counsellor dashboard.</p>
+    <input class="field" type="password" id="passwordInput" placeholder="Password" onkeydown="if(event.key==='Enter') login()">
+    <button class="btn-primary" onclick="login()">Sign in</button>
+    <div class="error-msg" id="errorMsg">Incorrect password. Please try again.</div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="dashboard">
+    <div class="status-bar">
+      <div class="badge"><span class="dot"></span> Online as counsellor</div>
+      <span id="queueBadge" style="font-size:0.85rem; color: var(--ink-muted);"></span>
+    </div>
+
+    <div class="queue-box" id="queueBox">
+      <div class="queue-num" id="queueCount">0</div>
+      <div class="queue-label">users waiting</div>
+      <button class="accept-btn" id="acceptBtn" onclick="acceptUser()" disabled>Accept next user</button>
+    </div>
+
+    <div class="timer-display" id="timerDisplay">45:00</div>
+
+    <div class="session-area" id="sessionArea">
+      <div>
+        <div class="video-area">
+          <div class="video-label" id="videoLabel">Waiting for video…</div>
+          <video id="remoteVideoCounsellor" autoplay playsinline></video>
+          <video id="selfVideoCounsellor" autoplay playsinline muted></video>
+        </div>
+        <button class="end-btn" id="endBtn" onclick="endSession()">End session</button>
+      </div>
+
+      <div class="chat-panel">
+        <div class="chat-header">Chat with user</div>
+        <div class="chat-messages" id="chatMessages"></div>
+        <div class="chat-input-row">
+          <input class="chat-input" id="chatInput" type="text" placeholder="Type a message…" onkeydown="if(event.key==='Enter') sendChat()">
+          <button class="send-btn" onclick="sendChat()">Send</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="ended-msg" id="endedMsg"></div>
+  </div>
+
+</main>
+
+<script>
+  const BACKEND_URL = 'https://mindconnneectt.onrender.com';
+
+  let socket = null;
+  let peer = null;
+  let currentCall = null;
+  let sessionId = null;
+  let localStream = null;
+
+  async function login() {
+    const password = document.getElementById('passwordInput').value;
+    const res = await fetch(`${BACKEND_URL}/counsellor-auth`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password })
+    });
+    const data = await res.json();
+    if (data.ok) {
+      document.getElementById('loginScreen').style.display = 'none';
+      document.getElementById('dashboard').style.display = 'block';
+      initCounsellor();
+    } else {
+      document.getElementById('errorMsg').style.display = 'block';
+    }
+  }
+
+  async function initCounsellor() {
+    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true }).catch(() => null);
+    if (localStream) document.getElementById('selfVideoCounsellor').srcObject = localStream;
+
+    socket = io(BACKEND_URL);
+    peer = new Peer(undefined, {
+      host: new URL(BACKEND_URL).hostname,
+      port: 443,
+      path: '/',
+      secure: true
+    });
+
+    peer.on('open', (peerId) => {
+      socket.emit('counsellor_join', { peerId });
+    });
+
+    peer.on('call', (call) => {
+      currentCall = call;
+      call.answer(localStream);
+      call.on('stream', (remoteStream) => {
+        document.getElementById('remoteVideoCounsellor').srcObject = remoteStream;
+        document.getElementById('videoLabel').style.display = 'none';
+      });
+    });
+
+    socket.on('queue_update', ({ count }) => updateQueue(count));
+    socket.on('user_waiting', ({ count }) => {
+      updateQueue(count);
+      // Browser notifikacija
+      if (Notification.permission === 'granted') {
+        new Notification('MindConnect', { body: `${count} user${count > 1 ? 's' : ''} waiting for a session.` });
+      }
+    });
+
+    socket.on('session_found', ({ sessionId: sid, partnerPeerId, role }) => {
+      sessionId = sid;
+      document.getElementById('queueBox').style.display = 'none';
+      document.getElementById('sessionArea').classList.add('visible');
+      document.getElementById('timerDisplay').style.display = 'block';
+      document.getElementById('endBtn').style.display = 'inline-block';
+      updateTimer(2700);
+
+      if (role === 'caller' && localStream) {
+        const call = peer.call(partnerPeerId, localStream);
+        currentCall = call;
+        call.on('stream', (remoteStream) => {
+          document.getElementById('remoteVideoCounsellor').srcObject = remoteStream;
+          document.getElementById('videoLabel').style.display = 'none';
+        });
+      }
+
+      socket.on('chat_message', ({ text }) => addMessage(text, false));
+    });
+
+    socket.on('timer_tick', ({ secondsLeft }) => updateTimer(secondsLeft));
+
+    socket.on('session_ended', ({ reason }) => {
+      const msgs = {
+        time_up: 'The 45-minute session has ended.',
+        partner_left: 'The user has left the session.',
+        partner_disconnected: 'The user disconnected.',
+        you_left: 'You ended the session.'
+      };
+      showEnded(msgs[reason] || 'Session ended.');
+    });
+
+    // Traži dopuštenje za notifikacije
+    if (Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }
+
+  function updateQueue(count) {
+    document.getElementById('queueCount').textContent = count;
+    document.getElementById('queueBadge').textContent = count > 0 ? `${count} user${count > 1 ? 's' : ''} in queue` : 'No users waiting';
+    document.getElementById('acceptBtn').disabled = count === 0;
+  }
+
+  function acceptUser() {
+    if (!peer) return;
+    socket.emit('accept_user', { counsellorPeerId: peer.id });
+  }
+
+  function updateTimer(secondsLeft) {
+    const m = Math.floor(secondsLeft / 60);
+    const s = secondsLeft % 60;
+    document.getElementById('timerDisplay').textContent =
+      String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  }
+
+  function addMessage(text, fromMe) {
+    const box = document.getElementById('chatMessages');
+    const msg = document.createElement('div');
+    msg.className = 'msg ' + (fromMe ? 'me' : 'them');
+    const now = new Date().toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' });
+    msg.innerHTML = text + `<div class="msg-meta">${fromMe ? 'You' : 'User'} · ${now}</div>`;
+    box.appendChild(msg);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function sendChat() {
+    const inp = document.getElementById('chatInput');
+    const val = inp.value.trim();
+    if (!val || !socket || !sessionId) return;
+    socket.emit('chat_message', { sessionId, text: val });
+    addMessage(val, true);
+    inp.value = '';
+  }
+
+  function endSession() {
+    if (socket && sessionId) socket.emit('end_session', { sessionId });
+    showEnded('You ended the session.');
+  }
+
+  function showEnded(message) {
+    if (currentCall) currentCall.close();
+    document.getElementById('sessionArea').classList.remove('visible');
+    document.getElementById('timerDisplay').style.display = 'none';
+    document.getElementById('endBtn').style.display = 'none';
+    document.getElementById('queueBox').style.display = 'block';
+    const el = document.getElementById('endedMsg');
+    el.textContent = message;
+    el.style.display = 'block';
+    sessionId = null;
+    currentCall = null;
+    setTimeout(() => { el.style.display = 'none'; }, 5000);
+  }
+</script>
+</body>
+</html>
