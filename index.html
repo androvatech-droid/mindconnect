@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MindConnect — Psychological Consulting</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Source+Sans+3:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/socket.io-client@4/dist/socket.io.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1/dist/peerjs.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ink: #1a1a1a;
+    --ink-muted: #555;
+    --ink-light: #888;
+    --border: #d0cec8;
+    --bg: #faf9f7;
+    --bg-card: #fff;
+    --accent: #2c6b5a;
+    --accent-light: #e8f2ef;
+    --danger: #8b2b2b;
+    --serif: 'Lora', Georgia, serif;
+    --sans: 'Source Sans 3', sans-serif;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 18px;
+    line-height: 1.8;
+    min-height: 100vh;
+  }
+
+  header {
+    padding: 1.5rem 2rem 0;
+    max-width: 860px;
+    margin: 0 auto;
+  }
+
+  .site-title { font-family: var(--serif); font-size: 2rem; font-weight: 600; letter-spacing: -0.02em; color: var(--ink); }
+  .site-tagline { font-size: 1rem; color: var(--ink-muted); margin-top: 0.15rem; font-weight: 300; }
+
+  nav {
+    display: flex;
+    gap: 2rem;
+    border-top: 2px solid var(--ink);
+    border-bottom: 1px solid var(--border);
+    padding: 0.6rem 0;
+    margin-top: 1rem;
+  }
+
+  nav a { font-size: 0.95rem; color: var(--ink-muted); text-decoration: none; cursor: pointer; transition: color 0.15s; }
+  nav a:hover, nav a.active { color: var(--ink); }
+
+  main { max-width: 860px; margin: 0 auto; padding: 2.5rem 2rem 4rem; }
+
+  section { display: none; }
+  section.active { display: block; }
+
+  h2 { font-family: var(--serif); font-size: 1.5rem; font-weight: 500; margin-bottom: 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+  p { color: var(--ink-muted); margin-bottom: 1rem; }
+
+  .how-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin: 2rem 0; }
+  .how-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px; padding: 1.25rem; }
+  .how-num { font-family: var(--serif); font-size: 1.6rem; color: var(--accent); font-weight: 600; margin-bottom: 0.4rem; }
+  .how-card h3 { font-family: var(--serif); font-size: 1.05rem; font-weight: 500; color: var(--ink); margin-bottom: 0.3rem; }
+  .how-card p { font-size: 0.95rem; margin: 0; }
+
+  .connect-box { background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px; padding: 2rem; margin-top: 1.5rem; text-align: center; }
+
+  .status-indicator { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: var(--ink-muted); margin-bottom: 1.5rem; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #aaa; }
+  .dot.online { background: var(--accent); animation: pulse 2s infinite; }
+
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+  .timer-display { font-family: var(--serif); font-size: 3.5rem; font-weight: 400; color: var(--ink); letter-spacing: 0.05em; margin: 0.5rem 0; display: none; }
+  .timer-label { font-size: 0.8rem; color: var(--ink-light); margin-bottom: 1.5rem; display: none; }
+
+  .btn { display: inline-block; font-family: var(--sans); font-size: 0.9rem; font-weight: 500; padding: 0.65rem 2rem; border-radius: 3px; border: 1px solid var(--ink); background: transparent; color: var(--ink); cursor: pointer; transition: background 0.15s, color 0.15s; text-decoration: none; }
+  .btn:hover { background: var(--ink); color: #fff; }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; font-size: 1rem; padding: 0.75rem 2.5rem; }
+  .btn-primary:hover { background: #234f43; border-color: #234f43; }
+  .btn-danger { background: var(--danger); border-color: var(--danger); color: #fff; display: none; }
+  .btn-danger:hover { background: #6b1e1e; }
+
+  .session-area { display: none; margin-top: 1.5rem; gap: 1.5rem; grid-template-columns: 1fr 320px; }
+  .session-area.visible { display: grid; }
+
+  .video-area { background: #111; border-radius: 4px; aspect-ratio: 4/3; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+  .video-placeholder { color: #555; font-family: var(--serif); font-size: 1rem; font-style: italic; text-align: center; }
+
+  video { width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; }
+  #selfVideo { position: absolute; bottom: 12px; right: 12px; width: 100px; height: 75px; z-index: 10; border-radius: 3px; border: 1px solid #444; object-fit: cover; }
+
+  .chat-panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px; display: flex; flex-direction: column; height: 100%; min-height: 360px; }
+  .chat-header { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); font-size: 0.8rem; color: var(--ink-muted); font-weight: 500; }
+  .chat-messages { flex: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
+
+  .msg { max-width: 85%; padding: 0.5rem 0.75rem; border-radius: 3px; font-size: 0.85rem; line-height: 1.5; }
+  .msg.them { background: var(--bg); border: 1px solid var(--border); align-self: flex-start; color: var(--ink); }
+  .msg.me { background: var(--accent-light); border: 1px solid #c0d9d0; align-self: flex-end; color: var(--ink); }
+  .msg-meta { font-size: 0.72rem; color: var(--ink-light); margin-top: 2px; }
+
+  .chat-input-row { padding: 0.75rem; border-top: 1px solid var(--border); display: flex; gap: 0.5rem; }
+  .chat-input { flex: 1; font-family: var(--sans); font-size: 0.85rem; border: 1px solid var(--border); border-radius: 3px; padding: 0.4rem 0.6rem; background: var(--bg); color: var(--ink); outline: none; }
+  .chat-input:focus { border-color: var(--accent); }
+  .send-btn { background: var(--accent); border: none; color: #fff; font-size: 0.85rem; padding: 0.4rem 0.8rem; border-radius: 3px; cursor: pointer; }
+
+  .waiting-state { display: none; padding: 2rem; text-align: center; }
+  .spinner { width: 32px; height: 32px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1rem; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .about-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem; }
+  .about-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px; padding: 1.25rem; }
+  .about-card h3 { font-family: var(--serif); font-size: 1.05rem; font-weight: 500; color: var(--ink); margin-bottom: 0.4rem; }
+  .about-card p { font-size: 0.95rem; margin: 0; }
+
+  @media (max-width: 600px) {
+    .how-grid { grid-template-columns: 1fr; }
+    .session-area { grid-template-columns: 1fr; }
+    .about-grid { grid-template-columns: 1fr; }
+    .site-title { font-size: 1.5rem; }
+  }
+
+  .notice { background: var(--accent-light); border-left: 3px solid var(--accent); padding: 0.75rem 1rem; font-size: 0.84rem; color: var(--ink-muted); border-radius: 0 3px 3px 0; margin-top: 1rem; }
+  .disclaimer { font-size: 0.78rem; color: var(--ink-light); margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); font-style: italic; }
+
+  .ended-msg { display: none; padding: 1.5rem; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; text-align: center; margin-top: 1.5rem; font-family: var(--serif); font-style: italic; color: var(--ink-muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="site-title">MindConnect</div>
+  <div class="site-tagline">Anonymous psychological consultation · 45 minutes · first call free of charge</div>
+  <nav>
+    <a class="active" onclick="showSection('home', this)">About</a>
+    <a onclick="showSection('connect', this)">Connect</a>
+    <a onclick="showSection('pricing', this)">Pricing</a>
+    <a onclick="showSection('volunteers', this)">Our Volunteers</a>
+    <a onclick="showSection('about', this)">The Project</a>
+    <a onclick="showSection('contact', this)">Contact</a>
+  </nav>
+</header>
+
+<main>
+
+  <!-- HOME -->
+  <section id="home" class="active">
+    <h2>About</h2>
+    <p>MindConnect connects you anonymously with a psychologically trained person for a private, confidential conversation. No registration. No recordings. Each session lasts 45 minutes.</p>
+    <p>Our approach is research-driven. We believe access to psychological support should not depend on income or geography. This platform documents and enables that mission.</p>
+
+    <div class="how-grid">
+      <div class="how-card">
+        <div class="how-num">01</div>
+        <h3>Connect</h3>
+        <p>Click "Connect" and the system automatically pairs you with an available counsellor, usually within two minutes.</p>
+      </div>
+      <div class="how-card">
+        <div class="how-num">02</div>
+        <h3>Talk</h3>
+        <p>You have 45 minutes of video or text conversation. You lead, talk about whatever you need.</p>
+      </div>
+      <div class="how-card">
+        <div class="how-num">03</div>
+        <h3>Stay anonymous</h3>
+        <p>No account required. No session recordings. The conversation is entirely private and disappears when you leave.</p>
+      </div>
+    </div>
+
+    <div class="notice">
+      This platform is not a substitute for professional psychiatric care. In a crisis, please contact a mental health helpline or emergency services.
+    </div>
+
+    <div style="margin-top: 2rem;">
+      <button class="btn btn-primary" onclick="showSection('connect', document.querySelector('nav a:nth-child(2)'))">Start a session</button>
+    </div>
+  </section>
+
+  <!-- CONNECT -->
+  <section id="connect">
+    <h2>Live session</h2>
+    <p>You will be connected with a psychologically trained volunteer. Waiting time is typically under two minutes.</p>
+
+    <div class="connect-box" id="connectBox">
+      <div class="status-indicator">
+        <span class="dot" id="statusDot"></span>
+        <span id="statusText">Not connected</span>
+      </div>
+
+      <div class="timer-display" id="timerDisplay">45:00</div>
+      <div class="timer-label" id="timerLabel">remaining in session</div>
+
+      <div class="waiting-state" id="waitingState">
+        <div class="spinner"></div>
+        <p style="font-size:0.9rem; margin:0;">Finding an available counsellor for you…</p>
+      </div>
+
+      <button class="btn btn-primary" id="startBtn" onclick="startSession()">Start session</button>
+      <button class="btn btn-danger" id="endBtn" onclick="endSession()">End session</button>
+    </div>
+
+    <div class="session-area" id="sessionArea">
+      <div>
+        <div class="video-area" id="videoArea">
+          <div class="video-placeholder" id="videoPlaceholder">
+            Connecting video…
+          </div>
+          <video id="remoteVideo" autoplay playsinline></video>
+          <video id="selfVideo" autoplay playsinline muted></video>
+        </div>
+      </div>
+
+      <div class="chat-panel">
+        <div class="chat-header">Text chat · session</div>
+        <div class="chat-messages" id="chatMessages"></div>
+        <div class="chat-input-row">
+          <input class="chat-input" id="chatInput" type="text" placeholder="Type a message…" onkeydown="if(event.key==='Enter') sendChat()">
+          <button class="send-btn" onclick="sendChat()">Send</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="ended-msg" id="endedMsg"></div>
+
+    <p class="disclaimer">All conversations are anonymous and are not stored. Counsellors are volunteers with psychology education, they are not licensed therapists or psychiatrists.</p>
+  </section>
+
+  <!-- PRICING -->
+  <section id="pricing">
+    <h2>Pricing</h2>
+    <p>Your first session is completely free. After that, sessions are available as a one-time purchase — no subscription, no hidden fees.</p>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem;">
+      <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px; padding: 1.5rem;">
+        <div style="font-family: var(--serif); font-size: 0.8rem; color: var(--ink-light); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.75rem;">First session</div>
+        <div style="font-family: var(--serif); font-size: 2.5rem; font-weight: 500; color: var(--ink); line-height: 1;">Free</div>
+        <div style="font-size: 0.82rem; color: var(--ink-light); margin-top: 0.25rem; margin-bottom: 1.25rem;">no payment required</div>
+        <div style="font-size: 0.85rem; color: var(--ink-muted); line-height: 1.6;">
+          45-minute video session<br>
+          Psychologically trained counsellor<br>
+          Fully anonymous<br>
+          No registration
+        </div>
+      </div>
+
+      <div style="background: var(--bg-card); border: 2px solid var(--accent); border-radius: 4px; padding: 1.5rem; position: relative;">
+        <div style="font-family: var(--serif); font-size: 0.8rem; color: var(--accent); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.75rem;">Subsequent sessions</div>
+        <div style="font-family: var(--serif); font-size: 2.5rem; font-weight: 500; color: var(--ink); line-height: 1;">€5</div>
+        <div style="font-size: 0.82rem; color: var(--ink-light); margin-top: 0.25rem; margin-bottom: 1.25rem;">per session</div>
+        <div style="font-size: 0.85rem; color: var(--ink-muted); line-height: 1.6; margin-bottom: 1.5rem;">
+          45-minute video session<br>
+          Psychologically trained counsellor<br>
+          Fully anonymous<br>
+          No subscription
+        </div>
+        <a href="https://buy.stripe.com/3cI9AT6Je4qQ3ulaYr5ZC00" target="_blank" style="display: inline-block; background: var(--accent); color: #fff; font-family: var(--sans); font-size: 0.9rem; font-weight: 500; padding: 0.65rem 1.5rem; border-radius: 3px; text-decoration: none; transition: background 0.15s;" onmouseover="this.style.background='#234f43'" onmouseout="this.style.background='var(--accent)'">Purchase a session</a>
+      </div>
+    </div>
+
+    <p class="disclaimer">Payment is processed securely via Stripe. After purchase you will receive a confirmation and access link for your next session.</p>
+  </section>
+
+  <!-- ABOUT -->
+  <section id="about">
+    <h2>The project</h2>
+    <p>MindConnect is an independent project with a single goal: make psychological support accessible to everyone, free of charge, anonymously, without waiting weeks for an appointment.</p>
+
+    <div class="about-grid">
+      <div class="about-card">
+        <h3>Privacy</h3>
+        <p>No registration. No conversation storage. Sessions run peer-to-peer wherever technically possible, meaning no data passes through a central server.</p>
+      </div>
+      <div class="about-card">
+        <h3>Counsellors</h3>
+        <p>Volunteers with psychology education: students, graduates, or certificate holders. Each has completed a brief screening and introductory training.</p>
+      </div>
+    </div>
+
+    <p class="disclaimer">Project developed by Andrej Milković as an independent research and humanitarian initiative. No commercial interests.</p>
+  </section>
+
+  <!-- VOLUNTEERS -->
+  <section id="volunteers">
+    <h2>Our Volunteers</h2>
+    <p>Every counsellor on MindConnect is a verified volunteer with documented psychology education.</p>
+
+    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px; padding: 1.5rem; margin-top: 1rem;">
+      <div style="display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+        <div>
+          <div style="font-family: var(--serif); font-size: 1.1rem; font-weight: 600; color: var(--ink);">Andrej Milković</div>
+          <div style="font-size: 0.85rem; color: var(--ink-light); margin-top: 0.1rem;">Psychology enthusiast and independent researcher</div>
+        </div>
+        <a href="https://x.com/thinkertfsr" target="_blank" style="font-size: 0.85rem; color: var(--accent); text-decoration: none; white-space: nowrap;">𝕏 @thinkertfsr</a>
+      </div>
+
+      <div style="border-top: 1px solid var(--border); padding-top: 1rem; display: flex; flex-direction: column; gap: 0.75rem;">
+        <div>
+          <div style="font-size: 0.88rem; font-weight: 500; color: var(--ink); margin-bottom: 0.1rem;">PSYCH101: Introduction to Psychology</div>
+          <div style="font-size: 0.82rem; color: var(--ink-light); margin-bottom: 0.25rem;">Saylor Academy · PSYCH101</div>
+          <a href="https://learn.saylor.org/admin/tool/certificate/index.php?code=6826396609AM" target="_blank" style="font-size: 0.85rem; color: var(--accent); text-decoration: none;">Verify certificate →</a>
+        </div>
+        <div style="border-top: 1px solid var(--border); padding-top: 0.75rem;">
+          <div style="font-size: 0.88rem; font-weight: 500; color: var(--ink); margin-bottom: 0.1rem;">PHIL203: Environmental Ethics, Justice, and World Views</div>
+          <div style="font-size: 0.82rem; color: var(--ink-light); margin-bottom: 0.25rem;">Saylor Academy · PHIL203</div>
+          <a href="https://learn.saylor.org/admin/tool/certificate/index.php?code=8919496776AM" target="_blank" style="font-size: 0.85rem; color: var(--accent); text-decoration: none;">Verify certificate →</a>
+        </div>
+        <div style="border-top: 1px solid var(--border); padding-top: 0.75rem;">
+          <div style="font-size: 0.88rem; font-weight: 500; color: var(--ink); margin-bottom: 0.1rem;">COMM001: Principles of Human Communication</div>
+          <div style="font-size: 0.82rem; color: var(--ink-light); margin-bottom: 0.25rem;">Saylor Academy · COMM001</div>
+          <a href="https://learn.saylor.org/admin/tool/certificate/index.php?code=4719711339AM" target="_blank" style="font-size: 0.85rem; color: var(--accent); text-decoration: none;">Verify certificate →</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+  <!-- CONTACT -->
+  <section id="contact">
+    <h2>Contact us</h2>
+    <p>Have a question, feedback, or interested in becoming a counsellor? We'd love to hear from you.</p>
+
+    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px; padding: 2.5rem; margin-top: 1.5rem; text-align: center;">
+      <div style="font-family: var(--serif); font-size: 1.5rem; font-weight: 500; color: var(--ink); margin-bottom: 0.5rem;">MindConnect</div>
+      <a href="mailto:mindsconnect7@gmail.com" style="font-size: 1.25rem; color: var(--accent); text-decoration: none; font-weight: 500; letter-spacing: 0.01em;">mindsconnect7@gmail.com</a>
+      <p style="margin-top: 1.5rem; font-size: 0.9rem; max-width: 480px; margin-left: auto; margin-right: auto;">We typically respond within 24 hours. Whether you're looking for support, want to volunteer as a counsellor, or have a general inquiry — feel free to write.</p>
+      <a href="mailto:mindsconnect7@gmail.com" style="display: inline-block; margin-top: 1rem; background: var(--accent); color: #fff; font-family: var(--sans); font-size: 0.95rem; font-weight: 500; padding: 0.7rem 2rem; border-radius: 3px; text-decoration: none;" onmouseover="this.style.background='#234f43'" onmouseout="this.style.background='var(--accent)'">Send us an email</a>
+    </div>
+  </section>
+
+</main>
+
+<footer style="border-top: 1px solid var(--border); margin-top: 2rem; padding: 1.5rem 2rem; max-width: 860px; margin-left: auto; margin-right: auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+  <span style="font-family: var(--serif); font-size: 0.9rem; color: var(--ink);">MindConnect</span>
+  <span style="font-size: 0.82rem; color: var(--ink-light);">
+    <a href="mailto:mindsconnect7@gmail.com" style="color: var(--accent); text-decoration: none;">mindsconnect7@gmail.com</a>
+  </span>
+</footer>
+
+<script>
+  // ── VAŽNO: Zamijeni ovaj URL s tvojim Render.com URL-om nakon deploymenta ──
+  const BACKEND_URL = 'https://mindconnneectt.onrender.com';
+
+  let socket = null;
+  let peer = null;
+  let currentCall = null;
+  let sessionId = null;
+  let localStream = null;
+
+  function showSection(id, el) {
+    document.querySelectorAll('section').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    if (el) el.classList.add('active');
+  }
+
+  function setStatus(text, online = false) {
+    document.getElementById('statusText').textContent = text;
+    const dot = document.getElementById('statusDot');
+    dot.className = 'dot' + (online ? ' online' : '');
+  }
+
+  function updateTimer(secondsLeft) {
+    const m = Math.floor(secondsLeft / 60);
+    const s = secondsLeft % 60;
+    document.getElementById('timerDisplay').textContent =
+      String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+  }
+
+  function addChatMessage(text, fromMe) {
+    const box = document.getElementById('chatMessages');
+    const msg = document.createElement('div');
+    msg.className = 'msg ' + (fromMe ? 'me' : 'them');
+    const now = new Date().toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' });
+    msg.innerHTML = text + `<div class="msg-meta">${fromMe ? 'You' : 'Counsellor'} · ${now}</div>`;
+    box.appendChild(msg);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  async function getLocalStream() {
+    try {
+      localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      document.getElementById('selfVideo').srcObject = localStream;
+      return localStream;
+    } catch (e) {
+      console.warn('Kamera nedostupna, nastavljamo bez videa:', e);
+      return null;
+    }
+  }
+
+  async function startSession() {
+    document.getElementById('startBtn').style.display = 'none';
+    document.getElementById('waitingState').style.display = 'block';
+    document.getElementById('endedMsg').style.display = 'none';
+    setStatus('Connecting…');
+
+    await getLocalStream();
+
+    // Spoji se na Socket.io backend
+    socket = io(BACKEND_URL);
+
+    // Inicijaliziraj PeerJS
+    peer = new Peer(undefined, {
+      host: new URL(BACKEND_URL).hostname,
+      port: 443,
+      path: '/peerjs',
+      secure: true
+    });
+
+    peer.on('open', (peerId) => {
+      console.log('PeerJS ID:', peerId);
+      setStatus('Finding a counsellor…');
+      socket.emit('find_session', { peerId });
+    });
+
+    // Primamo dolazni video poziv (receiver strana)
+    peer.on('call', (call) => {
+      currentCall = call;
+      call.answer(localStream);
+      call.on('stream', (remoteStream) => {
+        document.getElementById('remoteVideo').srcObject = remoteStream;
+        document.getElementById('videoPlaceholder').style.display = 'none';
+      });
+    });
+
+    // Socket eventi
+    socket.on('waiting', () => {
+      setStatus('Waiting for a counsellor…');
+    });
+
+    socket.on('session_found', ({ sessionId: sid, partnerPeerId, role }) => {
+      sessionId = sid;
+      document.getElementById('waitingState').style.display = 'none';
+      document.getElementById('sessionArea').classList.add('visible');
+      document.getElementById('timerDisplay').style.display = 'block';
+      document.getElementById('timerLabel').style.display = 'block';
+      document.getElementById('endBtn').style.display = 'inline-block';
+      setStatus('Session in progress', true);
+      updateTimer(2700);
+
+      // Caller inicira video poziv
+      if (role === 'caller' && localStream) {
+        const call = peer.call(partnerPeerId, localStream);
+        currentCall = call;
+        call.on('stream', (remoteStream) => {
+          document.getElementById('remoteVideo').srcObject = remoteStream;
+          document.getElementById('videoPlaceholder').style.display = 'none';
+        });
+      }
+
+      // Chat poruke kroz Socket.io
+      socket.on('chat_message', ({ text }) => {
+        addChatMessage(text, false);
+      });
+    });
+
+    socket.on('timer_tick', ({ secondsLeft }) => {
+      updateTimer(secondsLeft);
+    });
+
+    socket.on('session_ended', ({ reason }) => {
+      const messages = {
+        time_up: 'The 45-minute session has ended. Thank you for using MindConnect.',
+        partner_left: 'The counsellor has ended the session.',
+        partner_disconnected: 'The counsellor disconnected unexpectedly.',
+        you_left: 'You have ended the session.'
+      };
+      showEndedState(messages[reason] || 'Session ended.');
+    });
+
+    peer.on('error', (err) => {
+      console.error('PeerJS error:', err);
+    });
+  }
+
+  function sendChat() {
+    const inp = document.getElementById('chatInput');
+    const val = inp.value.trim();
+    if (!val || !socket || !sessionId) return;
+    socket.emit('chat_message', { sessionId, text: val });
+    addChatMessage(val, true);
+    inp.value = '';
+  }
+
+  function endSession() {
+    if (socket && sessionId) {
+      socket.emit('end_session', { sessionId });
+    }
+    showEndedState('You have ended the session. Thank you for using MindConnect.');
+  }
+
+  function showEndedState(message) {
+    if (currentCall) currentCall.close();
+    if (localStream) localStream.getTracks().forEach(t => t.stop());
+    if (peer) peer.destroy();
+    if (socket) socket.disconnect();
+
+    document.getElementById('sessionArea').classList.remove('visible');
+    document.getElementById('timerDisplay').style.display = 'none';
+    document.getElementById('timerLabel').style.display = 'none';
+    document.getElementById('endBtn').style.display = 'none';
+    document.getElementById('startBtn').style.display = 'inline-block';
+
+    const endedMsg = document.getElementById('endedMsg');
+    endedMsg.textContent = message;
+    endedMsg.style.display = 'block';
+
+    setStatus('Session ended');
+    sessionId = null;
+    socket = null;
+    peer = null;
+    currentCall = null;
+    localStream = null;
+  }
+</script>
+</body>
+</html>
